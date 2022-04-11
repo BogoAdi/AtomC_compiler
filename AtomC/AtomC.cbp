@@ -32,6 +32,7 @@
 			<Add option="-Wall" />
 		</Compiler>
 		<Unit filename="1c.txt" />
+		<Unit filename="2c.txt" />
 		<Unit filename="main.c">
 			<Option compilerVar="CC" />
 		</Unit>

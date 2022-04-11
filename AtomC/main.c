@@ -210,7 +210,7 @@ int getNextToken(){
                 if(nCh==5&&!memcmp(pStartCh,"break",5)) tk=addTk(BREAK);
                 else if(nCh==4&&!memcmp(pStartCh,"char",4)) tk=addTk(CHAR);
                 else if(nCh==6&&!memcmp(pStartCh,"double",6)) tk=addTk(DOUBLE);
-                else if(nCh==4&&!memcmp(pStartCh,"else",6)) tk=addTk(ELSE);
+                else if(nCh==4&&!memcmp(pStartCh,"else",4)) tk=addTk(ELSE);
                 else if(nCh==3&&!memcmp(pStartCh,"for",3)) tk=addTk(FOR);
                 else if(nCh==2&&!memcmp(pStartCh,"if",2)) tk=addTk(IF);
                 else if(nCh==3&&!memcmp(pStartCh,"int",3)) tk=addTk(INT);
@@ -618,7 +618,7 @@ bool typeBase(){
 bool arrayDecl(){
     Token *start=iTk;
     if(consume(LBRACKET)){
-        if(expr()){}
+        if(consume(CT_INT)){}
         if(consume(RBRACKET)){
             return true;
         }
@@ -636,7 +636,10 @@ bool fnDef(){
                     for(;;){
                         if(consume(COMMA)){
                             if(fnParam()){}
-                            else false;
+                            else
+                            {   iTk=start;
+                                false;
+                            }
                         }
                         else break;
                     }
@@ -669,14 +672,16 @@ bool fnParam(){
 bool stm(){
     Token *start=iTk;
     if(stmCompound()){return true;}
+    iTk=start;
     if(consume(IF)){
         if(consume(LPAR)){
             if(expr()){
                 if(consume(RPAR)){
                     if(stm()){
                         if(consume(ELSE)){
-                            if(stm()){}
-                            else false;
+                            if(stm()){return true;}
+                            iTk=start;
+                            return false;
                         }
                         return true;
                     }
@@ -767,10 +772,12 @@ bool exprAssign(){
             if(exprAssign()){
                 return true;
             }
-            if(exprOR()){
-                return true;
-            }
+
         }
+    }
+    iTk=start;
+    if(exprOR()){
+        return true;
     }
     iTk=start;
     return false;
@@ -989,12 +996,20 @@ bool exprPrimary(){
                 for(;;){
                     if(consume(COMMA)){
                         if(expr()){}
-                        else false;
+                        else {
+                            iTk=start;
+                            return false;
+                        }
+
                     }
                     else break;
                 }
             }
-            if(consume(RPAR)){}
+            if(consume(RPAR)){return true;}
+            else {
+                 iTk=start;
+                return false;
+            }
         }
         return true;
     }
@@ -1018,7 +1033,7 @@ int main()
 {
     FILE *fis;
 
-    fis=fopen("1c.txt","rb");
+    fis=fopen("2c.txt","rb");
     if(fis ==NULL){
         printf(" nu s-a putut deschide fisierul");
         return -1;
@@ -1033,6 +1048,10 @@ int main()
     while(getNextToken()!=END){
 
     }
-     showAtoms();
+    // showAtoms();
+    iTk=tokens;
+    bool c3=unit();
+    printf("%d ",c3);
+    showAtoms();
     return 0;
 }
