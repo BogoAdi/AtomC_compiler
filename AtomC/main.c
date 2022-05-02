@@ -3,6 +3,8 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdbool.h>
+#include "add.h"
+
 enum{
     /* IDENTIFCATORI & CONSTANTE */
     ID, CT_INT, CT_REAL, CT_CHAR, CT_STRING,
@@ -29,7 +31,14 @@ char bufin[30001];
 char * pCrtCh;
 Token *tokens, *lastToken;
 int line=1;
-
+void EliberareMemorie(){
+    Token *p;
+    while(tokens!=NULL){
+        p=tokens;
+        tokens=tokens->next;
+        free(p);
+    }
+}
 char *createString(const char *pStartCh,char *pCrtCh){
     char *fin;
     int n=pCrtCh-pStartCh;
@@ -49,15 +58,17 @@ void err(const char *fmt,...){
     vfprintf(stderr,fmt,va);
     fputc('\n',stderr);
     va_end(va);
+    EliberareMemorie();
     exit(-1);
 }
 
 void tkerr(const Token *tk, const char *fmt, ...){
     va_list va;
     va_start(va, fmt);
-    fprintf(stderr, "error in line %d: ",tk->line);
+    fprintf(stderr, "error in line %d: ",tk->line-1);
     vfprintf(stderr,fmt,va);
     fputc('\n',stderr);
+    EliberareMemorie();
     va_end(va);
     exit(-1);
 }
@@ -481,14 +492,16 @@ void showAtoms(){
 Token *iTk; // iteratorul în lista de atomi. Inițial pointează la primul atom din listă.
 Token *consumedTk; // atomul care tocmai a fost consumat. Va fi folosit în etapele următoare ale compilatorului.
 
-//bool consume(int code){
-//    if(iTk->code==code){  // dacă la poziția curentă avem codul cerut, consumăm atomul
-//        consumedTk=iTk;
-//        iTk=iTk->next;
-//        return true;
-//    }
-//return false; // dacă la poziția curentă se află un atom cu un alt cod decât cel cerut, nu are loc nicio acțiune
-//}
+bool consume(int code){
+    if(iTk->code==code){  // dacă la poziția curentă avem codul cerut, consumăm atomul
+        consumedTk=iTk;
+        iTk=iTk->next;
+        return true;
+    }
+return false; // dacă la poziția curentă se află un atom cu un alt cod decât cel cerut, nu are loc nicio acțiune
+}
+
+/*
  const char *tkCodeName(int code){
     char *a[]={"ID", "CT_INT", "CT_REAL", "CT_CHAR", "CT_STRING", "BREAK",
     "CHAR", "DOUBLE", "ELSE", "FOR", "IF", "INT", "RETURN",
@@ -511,6 +524,7 @@ bool consume(int code){
 printf(" => found %s\n",tkCodeName(iTk->code));
 return false;
 }
+*/
 //Lexical Syntax
 bool unit();
 bool structDef();
@@ -550,13 +564,10 @@ bool unit(){
         }
     if(consume(END)){
         return true;
-    }
+    }else {tkerr(iTk,"eroare de sintaxa");}
     iTk=start;
-    return false; //bist gut?
+    return false;
 }
-
-
-
 
 
 bool structDef(){
@@ -571,10 +582,10 @@ bool structDef(){
                     if(consume(RACC)){
                         if(consume(SEMICOLON)){
                             return true;
-                        }
-                    }
-            }
-        }
+                        }else { tkerr(iTk," Expecting ; after }");}
+                    }else{ tkerr(iTk," Expecting } at the end of struct");}
+            }//else {tkerr(iTk, "Missing { ");}
+        }else { tkerr(iTk, " Missing a name for the struct");}
     }
     iTk=start;
     return false;
@@ -588,8 +599,8 @@ bool varDef(){
             if(arrayDecl()){}
             if(consume(SEMICOLON)){
                 return true;
-            }
-        }
+            }else {tkerr(iTk," Expecting ; ");}
+        }else {tkerr(iTk, " Expecting an identifier after a type");}
     }
     iTk=start;
     return false;
@@ -609,7 +620,7 @@ bool typeBase(){
     if(consume(STRUCT)){
         if(consume(ID)){
             return true;
-        }
+        }else {tkerr(iTk," Expecting an identifier after struct");}
     }
     iTk=start;
     return false;
@@ -621,7 +632,7 @@ bool arrayDecl(){
         if(consume(CT_INT)){}
         if(consume(RBRACKET)){
             return true;
-        }
+        }else {tkerr(iTk, " expected a } at the end ");}
     }
     iTk=start;
     return false;
@@ -637,7 +648,8 @@ bool fnDef(){
                         if(consume(COMMA)){
                             if(fnParam()){}
                             else
-                            {   iTk=start;
+                            {   tkerr(iTk, " Expected a valid function parameter, the type or the name is missing, or the type is invalid  ");
+                                iTk=start;
                                 false;
                             }
                         }
@@ -647,10 +659,10 @@ bool fnDef(){
                 if(consume(RPAR)){
                     if(stmCompound()){
                         return true;
-                    }
-                }
+                    }else {tkerr(iTk, " Aspected a valid expresion");}
+                }else {tkerr(iTk, " Expected a ) ");}
             }
-        }
+        }else {tkerr(iTk," Missing identifier or { after a struct");}
     }
     iTk=start;
     return false;
@@ -663,7 +675,7 @@ bool fnParam(){
         if(consume(ID)){
             if(arrayDecl()){}
             return true;
-        }
+        }else {tkerr(iTk, " Expected a name after a type ");}
     }
     iTk=start;
     return false;
@@ -680,14 +692,15 @@ bool stm(){
                     if(stm()){
                         if(consume(ELSE)){
                             if(stm()){return true;}
+                                {tkerr(iTk,"Missing else branch code block");}
                             iTk=start;
                             return false;
                         }
                         return true;
-                    }
-                }
-            }
-        }
+                    } else {tkerr(iTk,"Missing  if branch code block ");}
+                }else {tkerr(iTk, " Expected   ) to close a if statement ");}
+            }else {tkerr(iTk,"  Missing if condition " );}
+        }else { tkerr(iTk, " Expected a ( after the if condition ");}
     }
     iTk=start;
     if(consume(WHILE)){
@@ -696,10 +709,10 @@ bool stm(){
                 if(consume(RPAR)){
                     if(stm()){
                         return true;
-                    }
-                }
-            }
-        }
+                    }else {tkerr(iTk, " Missing while branch code block");}
+                }else {tkerr(iTk, " Expected   ) to close a while statement ");}
+            }else {tkerr(iTk,"  Missing  while condition " );}
+        }else { tkerr(iTk, " Expected a ( after the while condition");}
     }
    iTk=start;
    if(consume(FOR)){
@@ -712,24 +725,24 @@ bool stm(){
                 if(consume(RPAR)){
                     if(stm()){
                         return true;
-                    }
-                }
-            }
-        }
-    }
+                    }else{ tkerr(iTk,"Missing for branch code block");}
+                }else {tkerr(iTk," Missing )");}
+            }else {tkerr(iTk," Missing ; ");}
+        }else {tkerr(iTk," Missing ;");}
+    }else {tkerr(iTk,"Missing (");}
    }
    iTk=start;
    if(consume(BREAK)){
         if(consume(SEMICOLON)){
             return true;
-        }
+        }else {tkerr(iTk,"Missing ;");}
    }
    iTk=start;
    if(consume(RETURN)){
         if(expr()){}
         if(consume(SEMICOLON)){
             return true;
-        }
+        }else {tkerr(iTk,"Missing ;");}
    }
    iTk=start;
    if(expr()){}
@@ -750,7 +763,7 @@ bool stmCompound(){
         }
         if(consume(RACC)){
             return true;
-        }
+        }else {tkerr(iTk,"Missing }");}
     }
     iTk=start;
     return false;
@@ -771,7 +784,7 @@ bool exprAssign(){
         if(consume(ASSIGN)){
             if(exprAssign()){
                 return true;
-            }
+            }else {tkerr(iTk,"Missing right expression term");}
 
         }
     }
@@ -788,7 +801,7 @@ bool exprOR(){
     if(exprAnd()){
         if(exprOrPrim()){
             return true;
-        }
+        }//else {tkerr(iTk,"Missing || ");}
     }
     iTk=start;
     return false;
@@ -799,8 +812,8 @@ bool exprOrPrim(){
         if(exprAnd()){
             if(exprOrPrim()){
                 return true;
-            }
-        }
+            }else {tkerr(iTk,"Missing ||  ");}
+        }else {tkerr(iTk,"Missing  expression after || ");}
     }
     iTk=start;
     return true;
@@ -811,7 +824,7 @@ bool exprAnd(){
     if(exprEq()){
         if(exprAndPrim()){
             return true;
-        }
+        }//else {tkerr(iTk,"Missing &&");}
     }
     iTk=start;
     return false;
@@ -822,8 +835,8 @@ bool exprAndPrim(){
         if(exprEq()){
             if(exprAndPrim()){
                 return true;
-            }
-        }
+            }else {tkerr(iTk,"Missing  &&");}
+        }else {tkerr(iTk,"Missing expression after &&");}
     }
     iTk=start;
     return true;
@@ -834,7 +847,7 @@ bool exprEq(){
     if(exprRel()){
         if(exprEqPrim()){
             return true;
-        }
+        }//else {tkerr(iTk,"Missing == or != operator");}
     }
     iTk=start;
     return false;
@@ -846,8 +859,8 @@ bool exprEqPrim(){
         if(exprRel()){
             if(exprEqPrim()){
                 return true;
-            }
-        }
+            }else {tkerr(iTk,"Missing == or != operator");}
+        }else {tkerr(iTk, "Missing expression after == or != ");}
     }
     iTk=start;
     return true;
@@ -857,7 +870,7 @@ bool exprRel(){
     if(exprAdd()){
         if(exprRelPrim()){
             return true;
-        }
+        }//else {tkerr(iTk,"Missing < ,> ,<= or >= operator");}
     }
     iTk=start;
     return false;
@@ -868,8 +881,8 @@ bool exprRelPrim(){
         if(exprAdd()){
             if(exprRelPrim()){
                 return true;
-            }
-        }
+            }else {tkerr(iTk,"Missing < ,> ,<= or >= operator");}
+        }else {tkerr(iTk,"Missing expression after < ,> ,<= or >= operator");}
     }
     iTk=start;
     return true;
@@ -891,8 +904,8 @@ bool exprAddPrim(){
         if(exprMul()){
             if(exprAddPrim()){
                 return true;
-            }
-        }
+            }else {tkerr(iTk,"Missing + or - operator");}
+        }else {tkerr(iTk,"Missing expression + or - operator");}
     }
     iTk=start;
     return true;
@@ -914,8 +927,8 @@ bool exprMulPrim(){
         if(exprCast()){
             if(exprMulPrim()){
                 return true;
-            }
-        }
+            }else {tkerr(iTk,"Missing * or / operator");}
+        }else {tkerr(iTk,"Missing  expression after * or / operator");}
     }
     iTk=start;
     return true;
@@ -930,8 +943,8 @@ bool exprCast(){
                 if(exprCast()){
                     return true;
                 }
-            }
-        }
+            }else {tkerr(iTk,"Missing }");}
+        }//else {tkerr(iTk,"Missing cast type base declaration");}
     }
     iTk=start;
     if(exprUnary()){
@@ -946,9 +959,10 @@ bool exprUnary(){
     if(consume(SUB)||consume(NOT)){
         if(exprUnary()){
             return true;
-        }
+        }else {tkerr(iTk,"Missing expression after  ! or  -");}
     }
     iTk=start;
+
     if(exprPostfix()){
         return true;
     }
@@ -974,8 +988,8 @@ bool exprPostfixPrim(){
                 if(exprPostfixPrim()){
                     return true;
                 }
-            }
-        }
+            }else {tkerr(iTk,"Missing ]");}
+        }else {tkerr(iTk,"Missing expression after [");}
     }
     iTk=start;
     if(consume(DOT)){
@@ -983,7 +997,7 @@ bool exprPostfixPrim(){
             if(exprPostfixPrim()){
                 return true;
             }
-        }
+        }else {tkerr(iTk,"Missing identifier after .");}
     }
     iTk=start;
     return true;
@@ -996,19 +1010,17 @@ bool exprPrimary(){
                 for(;;){
                     if(consume(COMMA)){
                         if(expr()){}
-                        else {
-                            iTk=start;
-                            return false;
-                        }
-
+                        else {tkerr(iTk,"Missing  expression after ,");}
                     }
                     else break;
                 }
             }
             if(consume(RPAR)){return true;}
-            else {
-                 iTk=start;
-                return false;
+            else
+            {
+                tkerr(iTk,"Missing ) ");
+                //iTk=start;
+                //return false;
             }
         }
         return true;
@@ -1022,8 +1034,8 @@ bool exprPrimary(){
         if(expr()){
             if(consume(RPAR)){
                 return true;
-            }
-        }
+            }else {tkerr(iTk,"Missing ) ");}
+        }else {tkerr(iTk,"Missing expression after (");}
     }
     iTk=start;
     return false;
@@ -1051,7 +1063,8 @@ int main()
     // showAtoms();
     iTk=tokens;
     bool c3=unit();
-    printf("%d ",c3);
-    showAtoms();
+    printf("%d \n",c3);
+  // showAtoms();
+    EliberareMemorie();
     return 0;
 }
