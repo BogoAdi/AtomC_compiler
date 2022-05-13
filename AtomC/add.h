@@ -1,5 +1,4 @@
 #pragma once
-
 // analiza de domeniu
 
 struct Symbol;typedef struct Symbol Symbol;
