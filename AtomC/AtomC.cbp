@@ -33,6 +33,7 @@
 		</Compiler>
 		<Unit filename="1c.txt" />
 		<Unit filename="2c.txt" />
+		<Unit filename="3c.txt" />
 		<Unit filename="add.c">
 			<Option compilerVar="CC" />
 		</Unit>
