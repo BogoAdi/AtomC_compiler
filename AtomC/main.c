@@ -842,12 +842,10 @@ bool arrayDecl(Type *t)
         if(consume(CT_INT))
         {
             Token *tkSize=consumedTk;
-            if(tkSize ->i >0)
                 t->n = tkSize ->i;
-            else
-                t->n=0;
 
-        }
+        } else
+            t->n=0;
         if(consume(RBRACKET))
         {
             return true;
@@ -1746,10 +1744,7 @@ bool exprPrimary( Ret *r)
                 tkerr(iTk,"Missing ) ");
             }
         }
-        else
-        {
-            tkerr(iTk,"Missing expression after (");
-        }
+
     }
     iTk=start;
     return false;
